@@ -1,0 +1,85 @@
+---
+title: "Clustering"
+author: "Jinmo Lee"
+date: '2021 5 9 '
+output: html_document
+---
+
+```{r}
+Similarity <- No_embedding_filtering %>%
+  select(맥주이름, 도수상세, ibu, 특이점수)
+
+head(No_embedding_filtering)
+
+write.csv(Similarity, 'C:/Users/samsung/Desktop/PSAT/주분/For_similarity_matrix2.csv')
+
+Clustering <- No_embedding_filtering %>%
+  select(맥주이름, 상세종류, 도수범주, ibu)
+
+Clustering$맥주이름 <- as.factor(Clustering$맥주이름)
+Clustering$상세종류 <- as.factor(Clustering$상세종류)
+Clustering$도수범주 <- as.factor(Clustering$도수범주)
+
+colSums(is.na(Clustering))
+
+view(Clustering)
+
+Clustering <- drop_na(Clustering)
+
+library(factoextra)
+library(cluster)
+
+k2=kmeans(Clustering[,2:4],iter.max=30,nstart=1,centers=5)
+
+t1<-fviz_nbclust(Clustering[,2:4],kmeans,method='wss')
+# silhouette 시각화
+t2<-factoextra::fviz_nbclust(numeric_data_scale,kmeans,method='silhouette')
+gridExtra::grid.arrange(t1,t2,ncol=2)
+
+library(cluster)
+gower_distance <- daisy(Clustering[, 2:4], metric = c("gower"))
+class(gower_distance)
+
+agg_clust_c <- hclust(gower_distance, method = "complete")
+
+plot(agg_clust_c)
+
+plot(agg_clust_c, main = "Agglomerative, complete linkages")
+
+sil_width <- c(NA)
+for(i in 2:8) {
+  pam_fit <- pam(gower_distance, diss = TRUE, k = i)
+  sil_width[i] <- pam_fit$silinfo$avg.width
+}
+
+plot(1:8, sil_width,
+     xlab = "Number of clusters",
+     ylab = "Silhouette Width")
+lines(1:8, sil_width)
+
+k <- 5
+pam_fit <- pam(gower_distance, diss = TRUE, k)
+pam_results <- Clustering %>%
+  mutate(cluster = pam_fit$clustering)
+
+pam_results %>%
+  arrange(cluster)
+
+install.packages('Rtsne')
+
+tsne_obj <- Rtsne(gower_distance, is_distance = TRUE)
+tsne_data <- tsne_obj$Y %>%
+  data.frame() %>%
+  setNames(c("X", "Y")) %>%
+  mutate(cluster = factor(pam_fit$clustering))
+ggplot(aes(x = X, y = Y), data = tsne_data) +
+  geom_point(aes(color = cluster))
+
+install.packages('dbscan')
+
+library(dbscan)
+
+hdb.model = hdbscan(gower_distance, minPts = 5)
+plot(hdb.model)
+
+```
